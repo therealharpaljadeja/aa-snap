@@ -14,6 +14,10 @@ import {
   SendHelloButton,
   Card,
 } from '../components';
+import { encodeFunctionData, parseEther } from 'viem';
+import { defaultSnapOrigin } from '../config';
+import { KeyringSnapRpcClient } from '@metamask/keyring-api';
+import { v4 as uuid } from 'uuid';
 
 const Container = styled.div`
   display: flex;
@@ -117,13 +121,83 @@ const Index = () => {
     }
   };
 
-  const handleSendHelloClick = async () => {
-    try {
-      await sendHello();
-    } catch (e) {
-      console.error(e);
-      dispatch({ type: MetamaskActions.SetError, payload: e });
-    }
+  const transferToken = async () => {
+    // let accounts = await window.ethereum.request({
+    //   method: 'eth_requestAccounts',
+    //   params: [],
+    // });
+    // console.log(accounts);
+    const abiItem = {
+      inputs: [
+        { name: 'to', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+      ],
+      name: 'transfer',
+      outputs: [],
+      stateMutability: '',
+      type: 'function',
+    };
+    const data = encodeFunctionData({
+      abi: [abiItem],
+      functionName: 'transfer',
+      args: ['0x4F4c70c011b065dc45a7A13Cb72E645c6a50Dde3', parseEther('10')],
+    });
+    // await window.ethereum.request({
+    //   method: 'eth_sendTransaction',
+    //   params: [
+    //     {
+    //       from: accounts[0],
+    //       to: '0x4E3fC6f7441A519729556Ab5BC627C4ee09685C5',
+    //       data,
+    //     },
+    //   ],
+    // });
+    // await window.ethereum.request({
+    //   method: 'wallet_invokeSnap',
+    //   params: {
+    //     snapId: defaultSnapOrigin,
+    //     request: {
+    //       method: 'eth_sendTransaction',
+    //       params: [
+    //         {
+    //           from: accounts[0],
+    //           to: '0x4E3fC6f7441A519729556Ab5BC627C4ee09685C5',
+    //           data,
+    //         },
+    //       ],
+    //     },
+    //   },
+    // });
+    let keyring = new KeyringSnapRpcClient(defaultSnapOrigin, window.ethereum);
+    let result = await keyring.listAccounts();
+    console.log(result);
+    // if (result.length > 0) {
+    //   await keyring.deleteAccount(result[0].id);
+    // }
+    // if (result.length == 0) {
+    //   await keyring.createAccount('ERC4337Account1');
+    // }
+    // result = await keyring.listAccounts();
+    // console.log(result);
+    let response = await keyring.submitRequest({
+      account: result[0].id,
+      scope: 'eip155:1',
+      request: {
+        jsonrpc: '2.0',
+        id: uuid(),
+        method: 'eth_sendTransaction',
+        params: [
+          result[0].address,
+          {
+            from: result[0].address,
+            to: '0xcEF0f7f7ee1650b4A8151f605d9258bA65D733F5',
+            data,
+            chainId: '1',
+          },
+        ],
+      },
+    });
+    console.log(response);
   };
 
   return (
@@ -183,7 +257,7 @@ const Index = () => {
             disabled={!state.installedSnap}
           />
         )}
-        <Card
+        {/* <Card
           content={{
             title: 'Send Hello message',
             description:
@@ -191,6 +265,25 @@ const Index = () => {
             button: (
               <SendHelloButton
                 onClick={handleSendHelloClick}
+                disabled={!state.installedSnap}
+              />
+            ),
+          }}
+          disabled={!state.installedSnap}
+          fullWidth={
+            state.isFlask &&
+            Boolean(state.installedSnap) &&
+            !shouldDisplayReconnectButton(state.installedSnap)
+          }
+        /> */}
+        <Card
+          content={{
+            title: 'Send Hello message',
+            description:
+              'Display a custom message within a confirmation screen in MetaMask.',
+            button: (
+              <SendHelloButton
+                onClick={transferToken}
                 disabled={!state.installedSnap}
               />
             ),
