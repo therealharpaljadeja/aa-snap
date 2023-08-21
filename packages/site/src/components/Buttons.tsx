@@ -3,93 +3,48 @@ import styled from 'styled-components';
 import { MetamaskState } from '../hooks';
 import { ReactComponent as FlaskFox } from '../assets/flask_fox.svg';
 import { shouldDisplayReconnectButton } from '../utils';
-
-const Link = styled.a`
-  display: flex;
-  align-self: flex-start;
-  align-items: center;
-  justify-content: center;
-  font-size: ${(props) => props.theme.fontSizes.small};
-  border-radius: ${(props) => props.theme.radii.button};
-  border: 1px solid ${(props) => props.theme.colors.background.inverse};
-  background-color: ${(props) => props.theme.colors.background.inverse};
-  color: ${(props) => props.theme.colors.text.inverse};
-  text-decoration: none;
-  font-weight: bold;
-  padding: 1rem;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &:hover {
-    background-color: transparent;
-    border: 1px solid ${(props) => props.theme.colors.background.inverse};
-    color: ${(props) => props.theme.colors.text.default};
-  }
-
-  ${({ theme }) => theme.mediaQueries.small} {
-    width: 100%;
-    box-sizing: border-box;
-  }
-`;
-
-const Button = styled.button`
-  display: flex;
-  align-self: flex-start;
-  align-items: center;
-  justify-content: center;
-  margin-top: auto;
-  ${({ theme }) => theme.mediaQueries.small} {
-    width: 100%;
-  }
-`;
-
-const ButtonText = styled.span`
-  margin-left: 1rem;
-`;
-
-const ConnectedContainer = styled.div`
-  display: flex;
-  align-self: flex-start;
-  align-items: center;
-  justify-content: center;
-  font-size: ${(props) => props.theme.fontSizes.small};
-  border-radius: ${(props) => props.theme.radii.button};
-  border: 1px solid ${(props) => props.theme.colors.background.inverse};
-  background-color: ${(props) => props.theme.colors.background.inverse};
-  color: ${(props) => props.theme.colors.text.inverse};
-  font-weight: bold;
-  padding: 1.2rem;
-`;
-
-const ConnectedIndicator = styled.div`
-  content: ' ';
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background-color: green;
-`;
+import { Button, Container, HStack, Link, Tag, Text } from '@chakra-ui/react';
+import SText from './Text';
 
 export const InstallFlaskButton = () => (
   <Link href="https://metamask.io/flask/" target="_blank">
-    <FlaskFox />
-    <ButtonText>Install MetaMask Flask</ButtonText>
+    <HStack backgroundColor={'#4823b0'} px="4" py="2" borderRadius={'md'}>
+      <FlaskFox />
+      <SText>Install Flask</SText>
+    </HStack>
   </Link>
 );
 
 export const ConnectButton = (props: ComponentProps<typeof Button>) => {
   return (
-    <Button {...props}>
+    <Button
+      {...props}
+      backgroundColor={'#4823b0'}
+      px="4"
+      py="2"
+      borderRadius={'md'}
+      gap={'3'}
+      _hover={{ backgroundColor: '#4823b0' }}
+    >
       <FlaskFox />
-      <ButtonText>Connect</ButtonText>
+      <SText>Connect</SText>
     </Button>
   );
 };
 
 export const ReconnectButton = (props: ComponentProps<typeof Button>) => {
   return (
-    <Button {...props}>
+    <Button
+      {...props}
+      backgroundColor={'#4823b0'}
+      px="4"
+      py="2"
+      borderRadius={'md'}
+      gap="3"
+      _hover={{ backgroundColor: '#4823b0' }}
+    >
       <FlaskFox />
-      <ButtonText>Reconnect</ButtonText>
+      <SText>Reconnect</SText>
     </Button>
   );
 };
@@ -118,9 +73,14 @@ export const HeaderButtons = ({
   }
 
   return (
-    <ConnectedContainer>
-      <ConnectedIndicator />
+    <Button>
+      <Container
+        height="10px"
+        width={'10px'}
+        borderRadius={'full'}
+        backgroundColor={'green.900'}
+      />
       <ButtonText>Connected</ButtonText>
-    </ConnectedContainer>
+    </Button>
   );
 };

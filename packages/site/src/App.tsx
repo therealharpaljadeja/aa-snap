@@ -4,14 +4,7 @@ import { Footer, Header } from './components';
 
 import { GlobalStyle } from './config/theme';
 import { ToggleThemeContext } from './Root';
-
-const Wrapper = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  min-height: 100vh;
-  max-width: 100vw;
-`;
+import { VStack } from '@chakra-ui/react';
 
 export type AppProps = {
   children: ReactNode;
@@ -22,12 +15,11 @@ export const App: FunctionComponent<AppProps> = ({ children }) => {
 
   return (
     <>
-      <GlobalStyle />
-      <Wrapper>
+      <VStack backgroundColor={'#251551'} width="100%" height="100%">
         <Header handleToggleClick={toggleTheme} />
         {children}
         <Footer />
-      </Wrapper>
+      </VStack>
     </>
   );
 };
