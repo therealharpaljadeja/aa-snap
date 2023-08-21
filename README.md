@@ -1,5 +1,22 @@
 ## Account Abstraction Snap
 
+<table align="center">
+  <tr>
+  <td>
+  <img width="100px" src="https://avatars.githubusercontent.com/u/10818037?s=200&v=4" align="center" alt="consensys" />
+    </td>
+  <td>
+  <img width="100px" src="https://avatars.githubusercontent.com/u/11744586?s=200&v=4" align="center" alt="metamask" />
+    </td>
+    <td>
+  <img width="100px" src="https://avatars.githubusercontent.com/u/125581500?s=200&v=4" align="center" alt="pimlico" />
+    </td>
+    <td>
+  <img src="https://github.com/thirdweb-dev/typescript-sdk/blob/main/logo.svg?raw=true" width="100" margin="20 20" alt="thirdweb"/>    
+    </td>
+  </tr>
+</table>
+
 #### Team
 
 - Harpalsinh Jadeja
