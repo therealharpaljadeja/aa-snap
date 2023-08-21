@@ -1,6 +1,6 @@
 import { OnRpcRequestHandler } from '@metamask/snaps-types';
 import { heading, panel, text } from '@metamask/snaps-ui';
-import { InternalMethod } from './permissions';
+import { InternalMethod, SigningMethods } from './permissions';
 // import { logRequest } from './utils';
 import {
   KeyringSnapRpcClient,
@@ -37,7 +37,7 @@ const loggerHandler: OnRpcRequestHandler = async ({ origin, request }) => {
 // }): Promise<any> => {
 //   switch (request.method) {
 //     // internal methods
-//     case InternalMethod.Hello: {
+//     case SigningMethods.SendTransaction: {
 //       return snap.request({
 //         method: 'snap_dialog',
 //         params: {

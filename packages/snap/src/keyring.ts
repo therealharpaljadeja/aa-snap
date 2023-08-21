@@ -1,21 +1,6 @@
-import { Common, Hardfork } from '@ethereumjs/common';
-import { JsonTx, TransactionFactory } from '@ethereumjs/tx';
-import {
-  Address,
-  ecsign,
-  stripHexPrefix,
-  toBuffer,
-  toChecksumAddress,
-} from '@ethereumjs/util';
-import {
-  SignTypedDataVersion,
-  TypedDataV1,
-  TypedMessage,
-  concatSig,
-  personalSign,
-  recoverPersonalSignature,
-  signTypedData,
-} from '@metamask/eth-sig-util';
+import { JsonTx } from '@ethereumjs/tx';
+import { Address, toChecksumAddress } from '@ethereumjs/util';
+
 import {
   Keyring,
   KeyringAccount,
@@ -25,20 +10,13 @@ import {
 import type { Json, JsonRpcRequest } from '@metamask/utils';
 import { Buffer } from 'buffer';
 import { v4 as uuid } from 'uuid';
-
 import { SigningMethods } from './permissions';
 import { getState, saveState } from './stateManagement';
-import { isEvmChain, serializeTransaction, isUniqueAccountName } from './utils';
+import { isEvmChain, isUniqueAccountName } from './utils';
 import { ethers } from 'ethers';
 import { BaseAccountAPI } from '@account-abstraction/sdk';
 import { BaseApiParams } from '@account-abstraction/sdk/dist/src/BaseAccountAPI';
-import {
-  defaultAbiCoder,
-  hexConcat,
-  hexDataSlice,
-  hexlify,
-  keccak256,
-} from 'ethers/lib/utils';
+import { hexConcat } from 'ethers/lib/utils';
 import { EntryPoint__factory } from '@account-abstraction/contracts';
 
 export type KeyringState = {
@@ -56,21 +34,38 @@ export type NotPromise<T> = {
   [P in keyof T]: Exclude<T[P], Promise<any>>;
 };
 
-const BASE_ACCOUNT_FACTORY = '0xeD13bA04d0266a47b548329cD63ACc84178287CF';
+// Snap supports 2 chains: Base and Linea (both testnet)
+const chains = {
+  '0x14a33': {
+    RPC_URL: 'https://goerli.base.org',
+    ACCOUNT_FACTORY: '0xeD13bA04d0266a47b548329cD63ACc84178287CF',
+    chainName: 'base-goerli',
+  },
+  '0xe704': {
+    RPC_URL:
+      'https://linea-goerli.infura.io/v3/985e620362294dddb10524a42b3d43a0',
+    ACCOUNT_FACTORY: '0xb68E99D84aCb7C34282086B44bE5105dE7c25496',
+    chainName: 'linea-testnet',
+  },
+};
+
 const ENTRYPOINT_ADDRESS = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
-const BASE_RPC_URL = 'https://goerli.base.org';
 
 class AccountAPI extends BaseAccountAPI {
   ownerAddress: Wallet;
-  constructor(params: BaseApiParams & { ownerAddress: Wallet }) {
-    let { ownerAddress } = params;
+  ACCOUNT_FACTORY: string;
+  constructor(
+    params: BaseApiParams & { ownerAddress: Wallet; accountFactory: string },
+  ) {
+    let { ownerAddress, accountFactory } = params;
     super(params);
     this.ownerAddress = ownerAddress;
+    this.ACCOUNT_FACTORY = accountFactory;
   }
 
   async getAccountInitCode(): Promise<string> {
     let SimpleAccountFactory = new ethers.Contract(
-      BASE_ACCOUNT_FACTORY,
+      this.ACCOUNT_FACTORY,
       [
         {
           type: 'function',
@@ -101,7 +96,7 @@ class AccountAPI extends BaseAccountAPI {
     );
 
     return hexConcat([
-      BASE_ACCOUNT_FACTORY,
+      this.ACCOUNT_FACTORY,
       SimpleAccountFactory.interface.encodeFunctionData('createAccount', [
         this.ownerAddress.account.address,
         0,
@@ -164,6 +159,7 @@ export class ERC4337Keyring implements Keyring {
     this.#signer = state.signer;
   }
 
+  // The signer that signs for all the SCW accounts.
   createSigner(options: Record<string, Json> | null = null): Wallet {
     console.log('Creating Signer');
     const { privateKey, address } = this.#generateKeyPair();
@@ -203,19 +199,24 @@ export class ERC4337Keyring implements Keyring {
     options: Record<string, Json> | null = null,
   ): Promise<KeyringAccount> {
     // Create signer for SCWs if not available.
-
     let keyringState = await getState();
-    console.log(keyringState);
+
     if (keyringState.signer == undefined) {
       this.#signer = this.createSigner();
     } else {
       this.#signer = keyringState.signer;
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(BASE_RPC_URL);
+    let chainId = await ethereum.request({
+      method: 'eth_chainId',
+    });
+
+    const provider = new ethers.providers.JsonRpcProvider(
+      chains[chainId].RPC_URL,
+    );
 
     const contract = new ethers.Contract(
-      BASE_ACCOUNT_FACTORY,
+      chains[chainId].ACCOUNT_FACTORY,
       [
         {
           type: 'function',
@@ -260,17 +261,7 @@ export class ERC4337Keyring implements Keyring {
       // options,
       options: { signer: this.#signer },
       address: data,
-      supportedMethods: [
-        'eth_sendTransaction',
-        'eth_sign',
-        'eth_signTransaction',
-        'eth_signTypedData_v1',
-        'eth_signTypedData_v2',
-        'eth_signTypedData_v3',
-        'eth_signTypedData_v4',
-        'eth_signTypedData',
-        'personal_sign',
-      ],
+      supportedMethods: ['eth_sendTransaction'],
       type: 'eip155:erc4337',
     };
 
@@ -396,25 +387,25 @@ export class ERC4337Keyring implements Keyring {
 
   async #handleSigningRequest(method: string, params: Json): Promise<Json> {
     switch (method) {
-      case 'personal_sign': {
-        const [from, message] = params as string[];
-        return this.#signPersonalMessage(from, message);
-      }
-
       case 'eth_sendTransaction':
       case 'eth_signTransaction':
       case SigningMethods.SignTransaction: {
         const [from, tx, opts] = params as [string, JsonTx, Json];
-        let provider = new ethers.providers.JsonRpcProvider(BASE_RPC_URL);
+
+        let provider = new ethers.providers.JsonRpcProvider(
+          chains[tx.chainId].RPC_URL,
+        );
 
         let account = new AccountAPI({
           provider,
           entryPointAddress: ENTRYPOINT_ADDRESS,
           accountAddress: from,
           ownerAddress: this.#signer,
+          accountFactory: chains[tx.chainId].ACCOUNT_FACTORY,
         });
 
         let initCode = '0x';
+
         // Check if account is deployed?
         if (await account.checkAccountPhantom()) {
           initCode = await account.getInitCode();
@@ -436,28 +427,10 @@ export class ERC4337Keyring implements Keyring {
           signature: '0x',
         };
 
-        let chainId = await ethereum.request({
-          method: 'eth_chainId',
-        });
+        console.log(`ChainId: ${tx.chainId}`);
 
-        console.log(`ChainId: ${chainId}`);
+        let gasPriceResponse = await this.getUserOperationGasPrice(tx.chainId);
 
-        let gasPriceResponseRaw = await fetch(
-          'https://api.pimlico.io/v1/base-goerli/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 2,
-              method: 'pimlico_getUserOperationGasPrice',
-            }),
-          },
-        );
-
-        let { result: gasPriceResponse } = await gasPriceResponseRaw.json();
         if (gasPriceResponse) {
           const maxFeePerGas = gasPriceResponse.fast.maxFeePerGas;
           const maxPriorityFeePerGas =
@@ -469,27 +442,10 @@ export class ERC4337Keyring implements Keyring {
           userOp.verificationGasLimit = ethers.utils.hexlify(400_000);
           userOp.callGasLimit = ethers.utils.hexlify(100_000);
 
-          let sponsorResponseRaw = await fetch(
-            `https://api.pimlico.io/v1/base-goerli/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-type': 'application/json',
-              },
-              body: JSON.stringify({
-                method: 'pm_sponsorUserOperation',
-                id: 1,
-                jsonrpc: '2.0',
-                params: [userOp, '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'],
-              }),
-            },
+          userOp.paymasterAndData = await this.sponsorUserOperation(
+            userOp,
+            tx.chainId,
           );
-
-          let { result: sponsorResponse } = await sponsorResponseRaw.json();
-
-          console.log(sponsorResponse);
-
-          userOp.paymasterAndData = sponsorResponse.paymasterAndData;
 
           const entryPoint = EntryPoint__factory.connect(
             ENTRYPOINT_ADDRESS,
@@ -498,55 +454,22 @@ export class ERC4337Keyring implements Keyring {
 
           let userOpHash = await entryPoint.getUserOpHash(userOp);
 
-          console.log(userOpHash);
-
           let signature = await account.signUserOpHash(userOpHash);
-          console.log(signature);
 
           userOp.signature = signature;
 
-          // let signedOpHash = await account.signUserOpHash(userOpHash);
-          // userOp.signature = signedOpHash;
-          let sendUserOpResponseRaw = await fetch(
-            `https://api.pimlico.io/v1/base-goerli/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-type': 'application/json',
-              },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'eth_sendUserOperation',
-                id: 1,
-                params: [userOp, ENTRYPOINT_ADDRESS],
-              }),
+          let sendUserOp = await this.sendUserOperation(userOp, tx.chainId);
+
+          await snap.request({
+            method: 'snap_notify',
+            params: {
+              type: 'inApp',
+              message: 'User Operation Sent!',
             },
-          );
+          });
 
-          let { result: sendUserOp } = await sendUserOpResponseRaw.json();
-          console.log(sendUserOp);
+          return sendUserOp;
         }
-
-        // send the userOp to the paymaster
-        return this.#signTransaction(from, tx, opts);
-      }
-
-      case 'eth_signTypedData':
-      case 'eth_signTypedData_v1':
-      case 'eth_signTypedData_v2':
-      case 'eth_signTypedData_v3':
-      case 'eth_signTypedData_v4': {
-        const [from, data, opts] = params as [
-          string,
-          Json,
-          { version: SignTypedDataVersion },
-        ];
-        return this.#signTypedData(from, data, opts);
-      }
-
-      case 'eth_sign': {
-        const [from, data] = params as [string, string];
-        return this.#signMessage(from, data);
       }
 
       default: {
@@ -555,84 +478,75 @@ export class ERC4337Keyring implements Keyring {
     }
   }
 
-  #signTransaction(from: string, tx: any, _opts: any): Json {
-    // Patch the transaction to make sure that the `chainId` is a hex string.
-    if (!tx.chainId.startsWith('0x')) {
-      tx.chainId = `0x${parseInt(tx.chainId, 10).toString(16)}`;
-    }
-
-    const wallet = this.#getWalletByAddress(from);
-    const privateKey = Buffer.from(wallet.privateKey, 'hex');
-    const common = Common.custom(
-      { chainId: tx.chainId },
-      {
-        hardfork:
-          tx.maxPriorityFeePerGas || tx.maxFeePerGas
-            ? Hardfork.London
-            : Hardfork.Istanbul,
-      },
-    );
-
-    const signedTx = TransactionFactory.fromTxData(tx, {
-      common,
-    }).sign(privateKey);
-
-    return serializeTransaction(signedTx.toJSON(), signedTx.type);
-  }
-
-  #signTypedData(
-    from: string,
-    data: Json,
-    opts: { version: SignTypedDataVersion } = {
-      version: SignTypedDataVersion.V1,
-    },
-  ): string {
-    const { privateKey } = this.#getWalletByAddress(from);
-    const privateKeyBuffer = Buffer.from(privateKey, 'hex');
-
-    return signTypedData({
-      privateKey: privateKeyBuffer,
-      data: data as unknown as TypedDataV1 | TypedMessage<any>,
-      version: opts.version,
-    });
-  }
-
-  #signPersonalMessage(from: string, request: string): string {
-    const { privateKey } = this.#getWalletByAddress(from);
-    const privateKeyBuffer = Buffer.from(privateKey, 'hex');
-    const messageBuffer = Buffer.from(request.slice(2), 'hex');
-
-    const signature = personalSign({
-      privateKey: privateKeyBuffer,
-      data: messageBuffer,
-    });
-
-    const recoveredAddress = recoverPersonalSignature({
-      data: messageBuffer,
-      signature,
-    });
-    if (recoveredAddress !== from) {
-      throw new Error(
-        `Signature verification failed for account "${from}" (got "${recoveredAddress}")`,
-      );
-    }
-
-    return signature;
-  }
-
-  #signMessage(from: string, data: string): string {
-    const { privateKey } = this.#getWalletByAddress(from);
-    const privateKeyBuffer = Buffer.from(privateKey, 'hex');
-    const message = stripHexPrefix(data);
-    const signature = ecsign(Buffer.from(message, 'hex'), privateKeyBuffer);
-    return concatSig(toBuffer(signature.v), signature.r, signature.s);
-  }
-
   async #saveState(): Promise<void> {
     await saveState({
       wallets: this.#wallets,
       requests: this.#requests,
       signer: this.#signer,
     });
+  }
+
+  async getUserOperationGasPrice(chainId): Promise<any> {
+    let gasPriceResponseRaw = await fetch(
+      `https://api.pimlico.io/v1/${chains[chainId].chainName}/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'pimlico_getUserOperationGasPrice',
+        }),
+      },
+    );
+
+    let { result } = await gasPriceResponseRaw.json();
+    return result;
+  }
+
+  async sponsorUserOperation(userOp, chainId) {
+    let sponsorResponseRaw = await fetch(
+      `https://api.pimlico.io/v1/${chains[chainId].chainName}/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: 'pm_sponsorUserOperation',
+          id: 1,
+          jsonrpc: '2.0',
+          params: [userOp, '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'],
+        }),
+      },
+    );
+
+    let { result } = await sponsorResponseRaw.json();
+
+    return result.paymasterAndData;
+  }
+
+  async sendUserOperation(userOp, chainId) {
+    let sendUserOpResponseRaw = await fetch(
+      `https://api.pimlico.io/v1/${chains[chainId].chainName}/rpc?apikey=67ed1d98-34bf-410c-8bdb-711a474f192e`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_sendUserOperation',
+          id: 1,
+          params: [userOp, ENTRYPOINT_ADDRESS],
+        }),
+      },
+    );
+
+    let { result } = await sendUserOpResponseRaw.json();
+
+    return result;
   }
 }

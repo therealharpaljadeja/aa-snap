@@ -29,6 +29,7 @@ export enum SigningMethods {
   SignTypedData = 'eth_signTypedData',
   SignPersonalMessage = 'personal_sign',
   EthSign = 'eth_sign',
+  SendTransaction = 'eth_sendTransaction',
 }
 
 export const PERMISSIONS = new Map<string, string[]>([
