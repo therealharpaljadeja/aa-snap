@@ -17,9 +17,14 @@ export const Footer = () => {
             </HStack>
           </VStack>
         </Link>
-        <Link href="https://docs.metamask.io/" target="_blank">
+        <Link href="https://docs.pimlico.io/" target="_blank">
           <HStack>
             <Image width="100px" src="./pimlico.png" />
+          </HStack>
+        </Link>
+        <Link href="https://portal.thirdweb.com/" target="_blank">
+          <HStack>
+            <Image width="100px" src="./thirdweb.png" />
           </HStack>
         </Link>
       </HStack>

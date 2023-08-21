@@ -56,9 +56,9 @@ export const Header = ({
         <SnapLogo color={'white'} size={28} />
         <SHeading size={'md'}>aa-snap</SHeading>
       </HStack>
-      <RightContainer>
+      {/* <RightContainer>
         <HeaderButtons state={state} onConnectClick={handleConnectClick} />
-      </RightContainer>
+      </RightContainer> */}
     </HStack>
   );
 };

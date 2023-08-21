@@ -15,7 +15,7 @@ export const App: FunctionComponent<AppProps> = ({ children }) => {
 
   return (
     <>
-      <VStack backgroundColor={'#251551'} width="100%" height="100%">
+      <VStack backgroundColor={'#251551'} width="100vw" height="100vh">
         <Header handleToggleClick={toggleTheme} />
         {children}
         <Footer />

@@ -1,18 +1,18 @@
 {
   "version": "0.1.0",
-  "description": "An example Snap written in TypeScript.",
-  "proposedName": "TypeScript Example Snap",
+  "description": "Account Abstraction Snap written in TypeScript.",
+  "proposedName": "AA Snap",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MetaMask/template-snap-monorepo.git"
+    "url": "https://github.com/therealharpaljadeja/aa-snap"
   },
   "source": {
-    "shasum": "mVrtphNihRjDB8U3jgqdsJIk541huECtWG0TdOoU544=",
+    "shasum": "MYtg+4xYydxToTxxTS5zav5hS/Voe7BJ7FzL4WU6fYg=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",
         "iconPath": "images/icon.svg",
-        "packageName": "snap",
+        "packageName": "4337-snap",
         "registry": "https://registry.npmjs.org/"
       }
     }
